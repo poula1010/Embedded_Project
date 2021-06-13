@@ -7,59 +7,96 @@
 #include "initialize.h"
 #include "to_str.h"
 #include "LedFlasher.h"
-#include "keypad.h"
+#include "stdbool.h"
+#include "stdlib.h"
+
 bool inputmode;
 
-float LongCurr;
-float Latcurr;
-float Latprev;
-float Longprev;
-float distance;
-float NMEAToNorm(float x);
+char Result[50];
+char Longbuff[12];
+char Latbuff[12];
 
+int currentmode;
 int starter;
 
-void UART5_Transmitter(unsigned char data);
+double LongCurr;
+double Latcurr;
+double Latprev;
+double Longprev;
+double distance;
+double NMEAToNorm(float x);
+
+unsigned char UART5_Receiver(void);
 void LongLatFetch(void);
 void LongLatbuff(void);
 void BuffToFloat(void);
 void UARTInitialize(void);
-
+char c[100];
 int main()
 {
-	initialize();
-  	UARTInitialize();
-	starter =0;
-	distance = 0.f;
-	inputmode = 1;
+	InitializeF();
+	currentmode = 1;
 	Lcd_Init();
 	delay_ms(20);
-		while (1)
+	
+	UARTInitialize();
+	starter =0;
+	distance =0.01;
+	while(1)
+	{	
+		if(distance>100)
+				{
+					GPIO_PORTF_DATA_R =0X02;
+				}	
+	/*	for(int i =0; i<100;i++)
 		{
-			keypad_Init();
-			if (inputmode)
+		 c[i]= UART5_Receiver();
+		}
+		for (int i =0;i<100;i++)
+		{
+			if(i%16 ==0)
 			{
-				Lcd_Char(keypad_getkey);
+				Lcd_Cmd(0x01);
 			}
-			else
+			Lcd_Char(c[i]);
+			delay_ms(100);
+		}*/
+				//LongLatFetch();
+		/*for (int i =0;i<50;i++)
+		{
+			if(i%16 ==0)
 			{
-				LongLatFetch();
+				Lcd_Cmd(0x01);
+			}
+			Lcd_Char(Result[i]);
+			delay_ms(100);
+		}*/
+			LongLatFetch();
 				LongLatbuff();
 				BuffToFloat();
-				distance += Distance_Calculator(Longprev,Latprev,LongCurr,Latcurr);
+				double distanceadded = Distance_Calculator(Longprev,Latprev,LongCurr,Latcurr);
+				if(distanceadded >= 0.00001)
+				{
+					distance+= distanceadded;
 				char lcdbuff[10];
         			To_str(distance,lcdbuff);
-				Lcd_String("distance=");
-				Lcd_String(lcdbuff);
-			}
-			//LedFlash();
+	
+				Lcd_Cmd(0x01);
+				//Lcd_String("distance=");
+				Lcd_String(lcdbuff);				
+				delay_ms(4000);
+				}
+		
 	}
-}
+	//inputmode =1;
+	//keypad_Init();
+	
 
-float NMEAToNorm(float x)
+}
+double NMEAToNorm(float x)
 {
 	int big = x/100;
-	float small = (x-100*big)/60.f;
+	double small = (x-100*big)/60.0;
 	return big+small;
 }
 void BuffToFloat()
@@ -83,7 +120,7 @@ void BuffToFloat()
 }
 
 /* LCD and GPIOB initialization Function */ 
-oid LongLatbuff()
+void LongLatbuff()
 {
 	int indexer =0;
 	const char s[2] = ",";
@@ -93,14 +130,14 @@ oid LongLatbuff()
 		
     while(token != NULL)
     {
-			if(indexer == 3)
+			if(indexer == 2)
         {
             for(int i =0;token[i] !=0 ;i++)
             {
             Latbuff[i] = token[i];
             }
         }
-                if(indexer == 5)
+                if(indexer == 4)
         {
             for(int i =0;token[i]!= 0;i++)
             {
@@ -120,32 +157,39 @@ void LongLatFetch()
 	//const char comma[2] = ",";
     //int index=0,degrees,i=0,j=0;
 	char c0 = UART5_Receiver();
-	//int indexer =0;
 		if(c0 == '$')
 		{
+					//Lcd_Char(c0);
 			char c1 = UART5_Receiver();
 			if(c1 == 'G')
 			{
+						//Lcd_Char(c1);
 				char c2 = UART5_Receiver();
 				{
 					if(c2 == 'P')
 					{
+						//Lcd_Char(c2);
 						char c3 = UART5_Receiver();
 						if(c3 =='R')
 						{
+								//	Lcd_Char(c3);
 							char c4 = UART5_Receiver();
 							if(c4 == 'M')
 							{
+										//Lcd_Char(c4);
 								char c5 = UART5_Receiver();
 								if(c5 == 'C')
 								{
+									//Lcd_Char(c5);
+									//delay_ms(2000);
 									char c6 = UART5_Receiver();
 									if(c6 == ',')
 									{
 										char c7 = UART5_Receiver();
 										if(c7 == ',')
 										{
-											//printstring("disabled");
+													Lcd_Cmd(0x01);
+													Lcd_String("disabled");
 													delay_ms(1000);
 										}
 										else
@@ -165,18 +209,12 @@ void LongLatFetch()
 			}
 		}
 }
-char UART5_Receiver(void)  
+unsigned char UART5_Receiver(void)  
 {
     char data;
 	  while((UART5->FR & (1<<4)) != 0); /* wait until Rx buffer is not full */
     data = UART5->DR ;  	/* before giving it another byte */
     return (unsigned char) data; 
-}
-
-void UART5_Transmitter(unsigned char data)  
-{
-    while((UART5->FR & (1<<5)) != 0); /* wait until Tx buffer not full */
-    UART5->DR = data;                  /* before giving it another byte */
 }
 
 /*void printstring(char *str)
@@ -209,3 +247,77 @@ void UARTInitialize()
 	
 	  delay_ms(1); 
 }
+/* LCD and GPIOB initialization Function */ 
+/*while (1)
+		{
+			//LedFlash();
+			if(inputmode)
+			{
+				if(indexer ==0)
+				{
+				Lcd_Cmd(0x01);
+				Lcd_Cmd(0x0F);
+				Lcd_String("LongD=");
+				}
+				char test = keypad_getkey();
+				char buffy[12];
+
+				if(test != NULL)
+				{
+					if(test != 'l')
+					{
+						buffy[indexer]=test;
+						indexer+=1;
+						Lcd_Char(test);
+						delay_ms(2000);
+					}
+					else
+					{
+						Lcd_Cmd(0x10);
+						indexer-=1;
+						delay_ms(2000);
+					}
+				}
+				
+			}
+			if(!inputmode)
+			{
+						if(currentmode ==0)
+					{
+						Lcd_Cmd(0x01);
+						//delay_ms(10);
+					  Lcd_String("LongC:");
+						char data[12];
+						To_str(12.8895,&data[0]);
+						Lcd_String(data);
+						Lcd_Line2();
+						To_str(53.5695,&data[0]);
+						Lcd_String("LatC:");
+						Lcd_String(data);
+					}
+											if(currentmode ==1)
+					{
+						Lcd_Cmd(0x01);
+						//delay_ms(10);
+					  Lcd_String("Distance=:");
+					}
+				char test = keypad_getkey();
+				if(test != NULL)
+				{
+				if(test == 'r' && currentmode ==0)
+				{
+					currentmode=1;
+					delay_ms(2000);
+				}
+				else if(test == 'r'  && currentmode ==1)
+				{
+					currentmode =0;
+					delay_ms(2000);
+			}
+				}
+				
+			}
+	}
+}
+
+*/		
