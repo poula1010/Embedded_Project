@@ -8,7 +8,7 @@ void Destination_Reached(float distance, float longcurr, float latcurr, float lo
 {
 	float longdiff = fabs(longend - longcurr);
 	float latdiff = fabs(latend - latcurr);
-	if (distance > 100 | (longdiff < delta) | (latdiff < delta))
+	if (distance > 100 || ((longdiff < delta) && (latdiff < delta)))
 	{
 		GPIO_PORTF_DATA_R |= 0x02;
 	}
